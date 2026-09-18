@@ -72,5 +72,5 @@ def load(
     typer.secho("Loaded encrypted .env into environment.", fg=typer.colors.GREEN)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     app()

@@ -30,7 +30,7 @@ jobs:
         run: ruff check .
 
       - name: Run tests
-        run: pytest --cov=envsecure --cov-report=term-missing
+        run: pytest --cov=envsecure --cov-report=term-missing --cov-fail-under=100
 
       - name: Static analysis with Bandit
         run: bandit -r src/ -ll

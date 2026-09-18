@@ -117,8 +117,8 @@ bandit -r src/ -ll
 pytest --cov=envsecure --cov-report=term-missing
 ```
 
-CI runs the same lint, Bandit, and test suite on every push and pull
-request across Python 3.10–3.12.
+CI runs the same lint, Bandit, and test suite (100% line coverage enforced)
+on every push and pull request across Python 3.10–3.12.
 
 ## Security
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 
 import pytest
+from argon2.exceptions import HashingError
 from cryptography.fernet import InvalidToken
 
+from envsecure import core as core_module
 from envsecure.core import EncryptionCore
 
 
@@ -78,6 +80,48 @@ def test_decrypt_with_wrong_password_raises(core: EncryptionCore, temp_env_file:
 def test_validate_password_strength(core: EncryptionCore):
     assert core.validate_password("weak", min_score=3) is False
     assert core.validate_password("Tr0ub4dor&3-xk9Q!mZp", min_score=3) is True
+
+
+def test_load_salt_missing_file_raises(core: EncryptionCore, temp_env_file: str):
+    # No salt has ever been saved for this filename.
+    with pytest.raises(FileNotFoundError):
+        core.generate_key("any-password", temp_env_file, load_existing_salt=True)
+
+
+def test_derive_key_wraps_hashing_error(core: EncryptionCore, monkeypatch):
+    def _boom(*args, **kwargs):
+        raise HashingError("simulated argon2 failure")
+
+    monkeypatch.setattr(core_module.low_level, "hash_secret_raw", _boom)
+    with pytest.raises(HashingError):
+        core.derive_key("password", b"0123456789abcdef")
+
+
+def test_encrypt_with_audit_log_logs_success(core: EncryptionCore, temp_env_file: str, caplog):
+    key = core.generate_key("strongpassword123!", temp_env_file, save_salt=True)
+    with caplog.at_level("INFO", logger="envsecure.core"):
+        core.encrypt(temp_env_file, key, audit_log=True)
+    assert any("Encrypted" in record.message for record in caplog.records)
+
+
+def test_decrypt_with_audit_log_logs_success(core: EncryptionCore, temp_env_file: str, caplog):
+    key = core.generate_key("strongpassword123!", temp_env_file, save_salt=True)
+    core.encrypt(temp_env_file, key)
+    with caplog.at_level("INFO", logger="envsecure.core"):
+        core.decrypt(f"{temp_env_file}.envs", key, audit_log=True)
+    assert any("Decrypted" in record.message for record in caplog.records)
+
+
+def test_encrypt_missing_source_file_raises_oserror(core: EncryptionCore, tmp_path):
+    key = core.generate_key("strongpassword123!", str(tmp_path / "missing.env"), save_salt=True)
+    with pytest.raises(OSError):
+        core.encrypt(str(tmp_path / "missing.env"), key)
+
+
+def test_decrypt_missing_source_file_raises_oserror(core: EncryptionCore, tmp_path):
+    key = core.generate_key("strongpassword123!", str(tmp_path / "missing.env"), save_salt=True)
+    with pytest.raises(OSError):
+        core.decrypt(str(tmp_path / "missing.envs"), key)
 
 
 def test_large_file_roundtrips(core: EncryptionCore, tmp_path):

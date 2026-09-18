@@ -50,3 +50,32 @@ def test_decrypt_wrong_password_reports_clean_error(temp_env_file):
     result = runner.invoke(app, ["decrypt", encrypted_file], input="wrong-password\n")
     assert result.exit_code == 1
     assert "Incorrect password" in result.output
+
+
+def test_decrypt_rejects_wrong_extension(tmp_path):
+    bad_file = tmp_path / "secrets.txt"
+    bad_file.write_text("not encrypted")
+    result = runner.invoke(app, ["decrypt", str(bad_file)])
+    assert result.exit_code == 1
+    assert "Invalid file extension" in result.output
+
+
+def test_load_command_success(temp_env_file, monkeypatch):
+    password = "Tr0ub4dor&3-xk9Q!mZp\n"
+    runner.invoke(app, ["encrypt", temp_env_file], input=password * 2)
+    encrypted_file = f"{temp_env_file}.envs"
+
+    monkeypatch.delenv("KEY", raising=False)
+    result = runner.invoke(app, ["load", encrypted_file], input=password)
+    assert result.exit_code == 0
+    assert "Loaded encrypted .env" in result.output
+
+
+def test_load_command_wrong_password_reports_clean_error(temp_env_file):
+    password = "Tr0ub4dor&3-xk9Q!mZp\n"
+    runner.invoke(app, ["encrypt", temp_env_file], input=password * 2)
+    encrypted_file = f"{temp_env_file}.envs"
+
+    result = runner.invoke(app, ["load", encrypted_file], input="wrong-password\n")
+    assert result.exit_code == 1
+    assert "Incorrect password" in result.output
